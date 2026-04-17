@@ -21,7 +21,7 @@ for (const cmd of [ping, monitor, help]) {
 client.once(Events.ClientReady, (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   startPoller(c);
-  startApiServer();
+  startApiServer(c);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

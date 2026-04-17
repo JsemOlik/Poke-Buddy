@@ -1,3 +1,4 @@
+import type { Client } from "discord.js";
 import {
   listProducts,
   listProductsByGuild,
@@ -25,7 +26,7 @@ function checkAuth(req: Request): boolean {
   return req.headers.get("X-API-Key") === API_KEY;
 }
 
-export function startApiServer(): void {
+export function startApiServer(client: Client): void {
   const port = parseInt(process.env.API_PORT ?? "4000", 10);
 
   Bun.serve({
@@ -37,10 +38,9 @@ export function startApiServer(): void {
       const url = new URL(req.url);
       const path = url.pathname;
 
-      // GET /api/guilds — list all guild IDs that have monitors
+      // GET /api/guilds — all guilds the bot is actually present in
       if (req.method === "GET" && path === "/api/guilds") {
-        const products = listProducts();
-        const guilds = [...new Set(products.map((p) => p.guild_id).filter(Boolean))];
+        const guilds = client.guilds.cache.map((g) => g.id);
         return json({ guilds });
       }
 

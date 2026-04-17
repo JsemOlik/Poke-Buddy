@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bunx --bun shadcn@latest add badge card skeleton)",
+      "Bash(bun run *)"
+    ]
+  }
+}
