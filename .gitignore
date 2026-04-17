@@ -27,6 +27,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# Chromium persistent profile (cookies, cf_clearance, etc.)
+chromium-data/
+
 # IntelliJ based IDEs
 .idea
 

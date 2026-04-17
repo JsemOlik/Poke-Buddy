@@ -2,6 +2,7 @@ const CDP_BASE = "http://127.0.0.1:9222";
 
 interface CdpMsg {
   id?: number;
+  sessionId?: string;
   method?: string;
   result?: unknown;
   error?: { message: string };
@@ -15,76 +16,93 @@ export interface CdpPage {
   close(): Promise<void>;
 }
 
-class CdpPageImpl implements CdpPage {
+// Multiplexes commands and events for both browser-level and page sessions
+// over a single WebSocket. Commands include sessionId for page-level requests;
+// responses and events echo it back for routing.
+class CdpSession {
   private msgId = 1;
-  private callbacks = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  private pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private eventHandlers = new Map<string, Array<(params: unknown) => void>>();
 
-  constructor(
-    private ws: WebSocket,
-    private targetId: string,
-  ) {
-    ws.addEventListener("message", (event) => {
-      const msg = JSON.parse(event.data as string) as CdpMsg;
+  constructor(private ws: WebSocket) {
+    ws.addEventListener("message", ({ data }) => {
+      const msg = JSON.parse(data as string) as CdpMsg;
+      const sid = msg.sessionId ?? "";
 
       if (msg.id !== undefined) {
-        const cb = this.callbacks.get(msg.id);
+        const cb = this.pending.get(`${sid}|${msg.id}`);
         if (cb) {
-          this.callbacks.delete(msg.id);
-          if (msg.error) cb.reject(new Error(msg.error.message));
-          else cb.resolve(msg.result);
+          this.pending.delete(`${sid}|${msg.id}`);
+          msg.error ? cb.reject(new Error(msg.error.message)) : cb.resolve(msg.result);
         }
       }
 
       if (msg.method) {
-        for (const handler of this.eventHandlers.get(msg.method) ?? []) {
-          handler(msg.params);
-        }
+        for (const h of this.eventHandlers.get(`${sid}|${msg.method}`) ?? []) h(msg.params);
       }
     });
   }
 
-  send(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  send(method: string, params: Record<string, unknown> = {}, sessionId?: string): Promise<unknown> {
     const id = this.msgId++;
+    this.pending.set(`${sessionId ?? ""}|${id}`, {
+      resolve: (v) => v,
+      reject: (e) => { throw e; },
+    });
     return new Promise((resolve, reject) => {
-      this.callbacks.set(id, { resolve, reject });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      this.pending.set(`${sessionId ?? ""}|${id}`, { resolve, reject });
+      const msg: Record<string, unknown> = { id, method, params };
+      if (sessionId) msg.sessionId = sessionId;
+      this.ws.send(JSON.stringify(msg));
     });
   }
 
-  private waitForEvent(event: string, timeoutMs: number): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-      const handlers = this.eventHandlers.get(event) ?? [];
-      this.eventHandlers.set(event, handlers);
+  onceEvent(method: string, sessionId: string | undefined, timeoutMs: number): Promise<unknown> {
+    const key = `${sessionId ?? ""}|${method}`;
+    const handlers = this.eventHandlers.get(key) ?? [];
+    this.eventHandlers.set(key, handlers);
 
+    return new Promise((resolve, reject) => {
       const handler = (params: unknown) => {
         clearTimeout(timer);
-        const idx = handlers.indexOf(handler);
-        if (idx !== -1) handlers.splice(idx, 1);
+        handlers.splice(handlers.indexOf(handler), 1);
         resolve(params);
       };
-
       const timer = setTimeout(() => {
-        const idx = handlers.indexOf(handler);
-        if (idx !== -1) handlers.splice(idx, 1);
-        reject(new Error(`Timeout waiting for CDP event: ${event}`));
+        handlers.splice(handlers.indexOf(handler), 1);
+        reject(new Error(`CDP event timeout: ${method}`));
       }, timeoutMs);
-
       handlers.push(handler);
     });
   }
 
+  close(): void {
+    this.ws.close();
+  }
+}
+
+class CdpPageImpl implements CdpPage {
+  constructor(
+    private cdp: CdpSession,
+    private targetId: string,
+    private sessionId: string,
+  ) {}
+
+  private cmd(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+    return this.cdp.send(method, params, this.sessionId);
+  }
+
   async goto(url: string, timeoutMs = 20_000): Promise<void> {
-    // Register listener BEFORE sending navigate to avoid missing a fast-firing event
-    const domReady = this.waitForEvent("Page.domContentEventFired", timeoutMs);
-    await this.send("Page.navigate", { url });
+    // Register listener before sending to avoid missing a fast-firing event
+    const domReady = this.cdp.onceEvent("Page.domContentEventFired", this.sessionId, timeoutMs);
+    await this.cmd("Page.navigate", { url });
     await domReady;
   }
 
   async waitForSelector(selector: string, timeoutMs = 10_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const res = await this.send("Runtime.evaluate", {
+      const res = await this.cmd("Runtime.evaluate", {
         expression: `document.querySelector(${JSON.stringify(selector)}) !== null`,
         returnByValue: true,
       }) as { result?: { value?: boolean } };
@@ -95,7 +113,7 @@ class CdpPageImpl implements CdpPage {
   }
 
   async content(): Promise<string> {
-    const res = await this.send("Runtime.evaluate", {
+    const res = await this.cmd("Runtime.evaluate", {
       expression: "document.documentElement.outerHTML",
       returnByValue: true,
     }) as { result?: { value?: string } };
@@ -103,23 +121,48 @@ class CdpPageImpl implements CdpPage {
   }
 
   async close(): Promise<void> {
-    this.ws.close();
-    await fetch(`${CDP_BASE}/json/close/${this.targetId}`).catch(() => {});
+    try { await this.cdp.send("Target.closeTarget", { targetId: this.targetId }); } catch {}
+    this.cdp.close();
   }
 }
 
 export async function openPage(): Promise<CdpPage> {
-  const res = await fetch(`${CDP_BASE}/json/new`);
-  const tab = await res.json() as { id: string; webSocketDebuggerUrl: string };
+  // Use browser-level WebSocket — avoids the /json/new HTTP endpoint which
+  // was deprecated in newer Chromium (returns non-JSON for GET requests).
+  const versionRes = await fetch(`${CDP_BASE}/json/version`);
+  const { webSocketDebuggerUrl } = await versionRes.json() as { webSocketDebuggerUrl: string };
 
-  const ws = new WebSocket(tab.webSocketDebuggerUrl);
+  const ws = new WebSocket(webSocketDebuggerUrl);
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("CDP WebSocket timed out")), 5_000);
+    const timer = setTimeout(() => reject(new Error("CDP browser WebSocket timed out")), 5_000);
     ws.addEventListener("open", () => { clearTimeout(timer); resolve(); }, { once: true });
-    ws.addEventListener("error", () => { clearTimeout(timer); reject(new Error("CDP WebSocket error")); }, { once: true });
+    ws.addEventListener("error", () => { clearTimeout(timer); reject(new Error("CDP browser WebSocket error")); }, { once: true });
   });
 
-  const page = new CdpPageImpl(ws, tab.id);
-  await page.send("Page.enable");
-  return page;
+  const cdp = new CdpSession(ws);
+
+  const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" }) as { targetId: string };
+  const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true }) as { sessionId: string };
+
+  await cdp.send("Page.enable", {}, sessionId);
+
+  // Patch headless indicators before any page scripts run
+  await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      if (!window.chrome) {
+        window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
+      }
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [
+          { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+          { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
+          { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' }
+        ]
+      });
+      Object.defineProperty(navigator, 'languages', { get: () => ['cs-CZ', 'cs', 'en-US', 'en'] });
+    `,
+  }, sessionId);
+
+  return new CdpPageImpl(cdp, targetId, sessionId);
 }

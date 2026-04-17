@@ -1,7 +1,14 @@
 import { chromium } from "playwright";
 import type { Subprocess } from "bun";
+import { join } from "path";
 
 const CDP_PORT = 9222;
+// Persist profile so cf_clearance and other cookies survive across restarts.
+// On first run with CHROMIUM_VISIBLE=1 the user solves any CAPTCHAs; the
+// cookie (~30 day lifetime) is saved here and reused in subsequent headless runs.
+const PROFILE_DIR = join(import.meta.dir, "../../../chromium-data");
+const HEADLESS = process.env.CHROMIUM_VISIBLE !== "1";
+
 let _proc: Subprocess | null = null;
 let _ensurePromise: Promise<void> | null = null;
 
@@ -29,19 +36,19 @@ async function spawnChromium(): Promise<void> {
   // Use Bun.spawn — chromium.launch() hangs in Bun because Playwright's
   // Node.js child_process stderr reading is incompatible with Bun's emulation.
   _proc?.kill();
-  _proc = Bun.spawn(
-    [
-      execPath,
-      "--headless=new",
-      `--remote-debugging-port=${CDP_PORT}`,
-      "--no-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-      "--disable-extensions",
-      "--disable-background-networking",
-    ],
-    { stdout: "ignore", stderr: "ignore" },
-  );
+  const args = [
+    execPath,
+    `--remote-debugging-port=${CDP_PORT}`,
+    `--user-data-dir=${PROFILE_DIR}`,
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-extensions",
+    "--disable-background-networking",
+    "--disable-blink-features=AutomationControlled",
+  ];
+  if (HEADLESS) args.splice(1, 0, "--headless=new");
+
+  _proc = Bun.spawn(args, { stdout: "ignore", stderr: "ignore" });
 
   await waitForCDP();
   console.log(`[browser] CDP ready on port ${CDP_PORT}`);

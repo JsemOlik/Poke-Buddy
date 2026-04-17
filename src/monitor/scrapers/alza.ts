@@ -20,7 +20,7 @@ export const alzaScraper: StockScraper = {
       console.log(`[alza] Page loaded, waiting for availability element`);
 
       try {
-        await page.waitForSelector('button[data-testid*="availabilityText"]', 8_000);
+        await page.waitForSelector('button[data-testid*="availabilityText"]', 15_000);
       } catch {
         console.log(`[alza] Availability selector timed out, parsing raw content`);
       }
