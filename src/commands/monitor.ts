@@ -1,4 +1,5 @@
 import {
+  type Client,
   ChatInputCommandInteraction,
   ModalSubmitInteraction,
   ButtonInteraction,
@@ -18,8 +19,12 @@ import {
   StringSelectMenuOptionBuilder,
 } from "discord.js";
 import type { ProductRow } from "../monitor/db.ts";
-import { addProduct, removeProduct, listProducts, setConfig } from "../monitor/db.ts";
+import { addProduct, removeProduct, setConfig, listProductsByGuild } from "../monitor/db.ts";
 import { getScraperForUrl, getStoreNameForUrl } from "../monitor/scrapers/index.ts";
+import { checkProductNow } from "../monitor/poller.ts";
+
+let _client: Client | null = null;
+export function initMonitor(client: Client): void { _client = client; }
 
 const PAGE_SIZE = 6;
 
@@ -169,7 +174,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction): Promise<void
 }
 
 async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
-  const products = listProducts();
+  const products = await listProductsByGuild(interaction.guildId ?? "");
   if (products.length === 0) {
     await interaction.reply({ content: "No monitors to remove.", flags: MessageFlags.Ephemeral });
     return;
@@ -179,13 +184,13 @@ async function handleRemove(interaction: ChatInputCommandInteraction): Promise<v
 }
 
 async function handleList(interaction: ChatInputCommandInteraction): Promise<void> {
-  const { embed, components } = buildListPage(listProducts(), 0);
+  const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), 0);
   await interaction.reply({ embeds: [embed], components, flags: MessageFlags.Ephemeral });
 }
 
 async function handleSetChannel(interaction: ChatInputCommandInteraction): Promise<void> {
   const channel = interaction.options.getChannel("channel", true);
-  setConfig("alert_channel_id", channel.id);
+  await setConfig(`alert_channel_id:${interaction.guildId ?? ""}`, channel.id);
   await interaction.reply({
     content: `Stock alerts will now be sent to <#${channel.id}>.`,
     flags: MessageFlags.Ephemeral,
@@ -232,8 +237,10 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
     parsed.pathname.split("/").filter(Boolean).pop()?.replace(/-/g, " ") ?? parsed.href;
   const label = scrapeResult?.label ?? fallbackLabel;
 
+  let product: ProductRow;
   try {
-    addProduct(parsed.href, storeName, label, interaction.user.id);
+    product = await addProduct(parsed.href, storeName, label, interaction.user.id, interaction.guildId ?? "");
+    if (_client) void checkProductNow(_client, product);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     await interaction.editReply({
@@ -244,7 +251,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
     return;
   }
 
-  const { embed, components } = buildListPage(listProducts(), 0);
+  const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), 0);
   await interaction.editReply({ embeds: [embed], components });
 }
 
@@ -257,8 +264,8 @@ export async function handleButton(interaction: ButtonInteraction): Promise<void
   }
 
   if (customId.startsWith("monitor:nav:")) {
-    const page = parseInt(customId.split(":")[2], 10);
-    const { embed, components } = buildListPage(listProducts(), page);
+    const page = parseInt(customId.split(":")[2]!, 10);
+    const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), page);
     await interaction.update({ embeds: [embed], components });
     return;
   }
@@ -269,9 +276,9 @@ export async function handleSelectMenu(
 ): Promise<void> {
   if (interaction.customId !== "monitor:remove-cmd") return;
 
-  removeProduct(parseInt(interaction.values[0], 10));
+  await removeProduct(parseInt(interaction.values[0]!, 10));
 
-  const products = listProducts();
+  const products = await listProductsByGuild(interaction.guildId ?? "");
   if (products.length === 0) {
     await interaction.update({ content: "No more monitors.", components: [] });
     return;

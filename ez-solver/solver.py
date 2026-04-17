@@ -13,6 +13,10 @@ MADE BY ISMOILOFF. GOOD LUCK HAVE FUN, THIS IS JUST PROJECT, USE IT ON UR OWN RI
 import nodriver as uc
 
 
+# On Linux (Docker), Chrome requires --no-sandbox when running as root
+EXTRA_CHROME_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"] if platform.system() == "Linux" else []
+
+
 def _find_chrome() -> str:
     """Return the Chrome executable path, checking common locations per OS."""
     if os.environ.get("CHROME_PATH"):
@@ -73,6 +77,7 @@ async def _solve(sitekey: str, siteurl: str, timeout: int) -> str:
         browser_executable_path=_find_chrome(),
         headless=False,
         user_data_dir=_get_profile_dir(),
+        browser_args=EXTRA_CHROME_ARGS,
     )
 
     try:
