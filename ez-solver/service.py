@@ -74,7 +74,7 @@ async def _fetch_url(url: str, wait: float) -> str:
             try:
                 for _ in range(int(wait / 0.5)):
                     content = await page.get_content()
-                    if "availabilityText" in content or "ads-pb__price" in content:
+                    if "availabilityText" in content or "ads-pb__price" in content or "buyBox-price" in content:
                         await _asyncio.sleep(3)
                         return await page.get_content()
                     await _asyncio.sleep(0.5)

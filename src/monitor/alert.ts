@@ -7,6 +7,7 @@ const storeDisplayNames: Record<string, string> = {
   cdmc:      "CDMC.cz",
   xzone:     "Xzone.cz",
   alza:      "Alza.cz",
+  smarty:    "Smarty.cz",
 };
 
 const storeColors: Record<string, number> = {
@@ -14,7 +15,8 @@ const storeColors: Record<string, number> = {
   cardstore: 0xffd700, // gold
   cdmc:      0xe74c3c, // red
   xzone:     0xEB6524, // orange
-  alza:      0xe2001a, // alza red
+  alza:      0x00a650, // alza green
+  smarty:    0xe4007c, // smarty magenta
 };
 
 export function buildStockAlert(

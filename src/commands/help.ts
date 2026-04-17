@@ -11,7 +11,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     .addFields(
       {
         name: "/monitor add",
-        value: "Opens a form to start monitoring a product URL. Supports HraNaNetu.cz, CardStore.cz, CDMC.cz, Xzone.cz, and Alza.cz.",
+        value: "Opens a form to start monitoring a product URL. Supports HraNaNetu.cz, CardStore.cz, CDMC.cz, Xzone.cz, Alza.cz, and Smarty.cz.",
         inline: false,
       },
       {

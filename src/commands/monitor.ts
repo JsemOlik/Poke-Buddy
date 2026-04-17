@@ -29,6 +29,7 @@ const storeDisplayNames: Record<string, string> = {
   cdmc: "CDMC.cz",
   xzone: "Xzone.cz",
   alza: "Alza.cz",
+  smarty: "Smarty.cz",
 };
 
 export const data = new SlashCommandBuilder()
@@ -211,7 +212,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
   if (!storeName) {
     await interaction.reply({
       content:
-        "Unsupported store. Currently supported: **HraNaNetu.cz**, **CardStore.cz**, **CDMC.cz**, **Xzone.cz**, **Alza.cz**.",
+        "Unsupported store. Currently supported: **HraNaNetu.cz**, **CardStore.cz**, **CDMC.cz**, **Xzone.cz**, **Alza.cz**, **Smarty.cz**.",
       flags: MessageFlags.Ephemeral,
     });
     return;
