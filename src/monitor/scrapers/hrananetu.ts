@@ -24,6 +24,14 @@ export const hrananetuScraper: StockScraper = {
       ?.getAttribute("content");
     const price = priceValue ? `${priceValue} Kč` : undefined;
 
-    return { inStock, label, price };
+    // "(3\nks na skladě)" → "3 ks na skladě"
+    const stockAmount = root
+      .querySelector("em.c-mu")
+      ?.text.trim()
+      .replace(/[()]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || undefined;
+
+    return { inStock, label, price, stockAmount };
   },
 };

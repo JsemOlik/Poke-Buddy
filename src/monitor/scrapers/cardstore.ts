@@ -25,12 +25,19 @@ export const cardstoreScraper: StockScraper = {
       availText.length > 0 &&
       !OUT_OF_STOCK_PHRASES.some((p) => availText.includes(p));
 
-    // strong[data-testid="productCardPrice"] > span.price-final-holder
+    // "(>5 ks)" → ">5 ks"
+    const stockAmount = root
+      .querySelector('[data-testid="numberAvailabilityAmount"]')
+      ?.text.trim()
+      .replace(/[()]/g, "")
+      .replace(/\s+/g, " ")
+      .trim() || undefined;
+
     const priceText = root
       .querySelector('[data-testid="productCardPrice"] .price-final-holder')
       ?.text.trim()
-      .replace(/\s+/g, " "); // collapse non-breaking spaces
+      .replace(/\s+/g, " ");
 
-    return { inStock, label, price: priceText };
+    return { inStock, label, price: priceText, stockAmount };
   },
 };
