@@ -1,0 +1,20 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y \
+    chromium \
+    xvfb \
+    curl \
+    --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install nodriver directly — bypasses the >=3.14 constraint in pyproject.toml
+RUN pip install --no-cache-dir nodriver
+
+WORKDIR /app
+COPY service.py solver.py ./
+
+ENV CHROME_PATH=/usr/bin/chromium
+ENV PORT=8191
+
+EXPOSE 8191
+CMD ["python", "service.py"]

@@ -1,7 +1,7 @@
 import { parse } from "node-html-parser";
 import type { StockScraper, ScrapeResult } from "./base.ts";
 
-const SOLVER_URL = "http://127.0.0.1:8191";
+const SOLVER_URL = process.env.SOLVER_URL ?? "http://127.0.0.1:8191";
 const OUT_OF_STOCK_PHRASES = ["není skladem", "nedostupné", "vyprodáno"];
 
 export const alzaScraper: StockScraper = {

@@ -29,6 +29,8 @@ from solver import solve, _find_chrome, _get_profile_dir
 
 
 PORT = int(os.environ.get("PORT", 8191))
+# On Linux (Docker), Chrome requires --no-sandbox when running as root
+EXTRA_CHROME_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"] if platform.system() == "Linux" else []
 MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 4))
 
 _worker_sem = threading.Semaphore(MAX_WORKERS)
@@ -67,6 +69,7 @@ async def _fetch_url(url: str, wait: float) -> str:
                 browser_executable_path=_find_chrome(),
                 headless=False,
                 user_data_dir=_get_profile_dir(),
+                browser_args=EXTRA_CHROME_ARGS,
             )
 
         try:

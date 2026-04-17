@@ -14,15 +14,30 @@ services:
       timeout: 5s
       retries: 10
 
+  ez-solver:
+    build:
+      context: ./ez-solver
+      dockerfile: Dockerfile.solver
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8191/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
   bot:
     build: .
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+      ez-solver:
+        condition: service_healthy
     env_file: .env
     environment:
       DATABASE_URL: postgres://pokebuddy:${POSTGRES_PASSWORD:-changeme}@db:5432/pokebuddy
+      SOLVER_URL: http://ez-solver:8191
     ports:
       - "${API_PORT:-4040}:4040"
 
