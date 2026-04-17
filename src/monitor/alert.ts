@@ -2,15 +2,17 @@ import { EmbedBuilder, Colors } from "discord.js";
 import type { ProductRow } from "./db.ts";
 
 const storeDisplayNames: Record<string, string> = {
-  hrananetu: "HranaNetu.cz",
+  hrananetu: "HraNaNetu.cz",
   cardstore: "CardStore.cz",
-  cdmc: "CDMC.cz",
+  cdmc:      "CDMC.cz",
+  xzone:     "Xzone.cz",
 };
 
 const storeColors: Record<string, number> = {
   hrananetu: 0x4b0082, // dark purple
   cardstore: 0xffd700, // gold
   cdmc:      0xe74c3c, // red
+  xzone:     Colors.Green, // default green until user picks a color
 };
 
 export function buildStockAlert(

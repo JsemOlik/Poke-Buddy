@@ -74,7 +74,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction): Promise<void
   const storeName = getStoreNameForUrl(parsed.href);
   if (!storeName) {
     await interaction.reply({
-      content: `Unsupported store. Currently supported: **HranaNetu.cz**, **CardStore.cz**, **CDMC.cz**.`,
+      content: `Unsupported store. Currently supported: **HranaNetu.cz**, **CardStore.cz**, **CDMC.cz**, **Xzone.cz**.`,
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -148,9 +148,10 @@ async function handleList(interaction: ChatInputCommandInteraction): Promise<voi
   }
 
   const storeDisplayNames: Record<string, string> = {
-    hrananetu: "HranaNetu.cz",
+    hrananetu: "HraNaNetu.cz",
     cardstore: "CardStore.cz",
     cdmc: "CDMC.cz",
+    xzone: "Xzone.cz",
   };
 
   const rows = products.map((p) => {
