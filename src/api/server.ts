@@ -10,6 +10,7 @@ import {
   setConfig,
 } from "../monitor/db.ts";
 import { getScraperForUrl, getStoreNameForUrl } from "../monitor/scrapers/index.ts";
+import { checkProductNow } from "../monitor/poller.ts";
 
 const API_KEY = process.env.API_SECRET_KEY ?? "";
 const CORS_ORIGIN = process.env.WEB_ORIGIN ?? "http://localhost:3000";
@@ -50,7 +51,7 @@ export function startApiServer(client: Client): void {
       // GET /api/guilds/:id — guild name + icon
       const guildMatch = path.match(/^\/api\/guilds\/(\d+)$/);
       if (req.method === "GET" && guildMatch) {
-        const guild = client.guilds.cache.get(guildMatch[1]);
+        const guild = client.guilds.cache.get(guildMatch[1]!);
         if (!guild) return json({ error: "Guild not found" }, 404);
         return json({
           id: guild.id,
@@ -62,7 +63,7 @@ export function startApiServer(client: Client): void {
       // GET /api/guilds/:id/channels — text channels for the guild
       const channelsMatch = path.match(/^\/api\/guilds\/(\d+)\/channels$/);
       if (req.method === "GET" && channelsMatch) {
-        const guild = client.guilds.cache.get(channelsMatch[1]);
+        const guild = client.guilds.cache.get(channelsMatch[1]!);
         if (!guild) return json({ error: "Guild not found" }, 404);
         const channels = guild.channels.cache
           .filter((c) => c.type === ChannelType.GuildText)
@@ -108,6 +109,7 @@ export function startApiServer(client: Client): void {
 
         try {
           const product = addProduct(parsed.href, storeName, label, addedBy, guildId);
+          void checkProductNow(client, product);
           return json({ monitor: product }, 201);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -116,11 +118,14 @@ export function startApiServer(client: Client): void {
         }
       }
 
-      // DELETE /api/monitors/:id
+      // DELETE /api/monitors/:id?guild=<guildId>
       const deleteMatch = path.match(/^\/api\/monitors\/(\d+)$/);
       if (req.method === "DELETE" && deleteMatch) {
-        const id = parseInt(deleteMatch[1], 10);
-        if (!getProduct(id)) return json({ error: "Not found" }, 404);
+        const id = parseInt(deleteMatch[1]!, 10);
+        const delGuildId = url.searchParams.get("guild") ?? "";
+        const product = getProduct(id);
+        if (!product) return json({ error: "Not found" }, 404);
+        if (delGuildId && product.guild_id !== delGuildId) return json({ error: "Not found" }, 404);
         removeProduct(id);
         return json({ success: true });
       }

@@ -20,6 +20,7 @@ for (const cmd of [ping, monitor, help]) {
 
 client.once(Events.ClientReady, (c) => {
   console.log(`Logged in as ${c.user.tag}`);
+  monitor.initMonitor(c);
   startPoller(c);
   startApiServer(c);
 });
