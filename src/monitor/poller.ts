@@ -10,8 +10,8 @@ const FAST_INTERVAL_MS = 30_000;  // 30 sec
 let pollHandle: ReturnType<typeof setInterval> | null = null;
 let running = false;
 
-export function startPoller(client: Client): void {
-  const intervalMs = parseInt(getConfig("poll_interval_ms") ?? "30000", 10);
+export async function startPoller(client: Client): Promise<void> {
+  const intervalMs = parseInt((await getConfig("poll_interval_ms")) ?? "30000", 10);
   void runPollCycle(client);
   pollHandle = setInterval(() => void runPollCycle(client), intervalMs);
   console.log(`[monitor] Poller started (interval: ${intervalMs / 1000}s)`);
@@ -28,7 +28,7 @@ async function runPollCycle(client: Client): Promise<void> {
   if (running) return;
   running = true;
   try {
-    const products = listProducts();
+    const products = await listProducts();
     if (products.length === 0) return;
     console.log(`[monitor] Poll cycle — ${products.length} product(s)`);
     await Promise.allSettled(products.map((p) => checkProduct(client, p)));
@@ -37,8 +37,6 @@ async function runPollCycle(client: Client): Promise<void> {
   }
 }
 
-// Called by the poller — respects per-store intervals.
-// Called with force=true after a manual add to skip the interval guard.
 async function checkProduct(client: Client, product: ProductRow, force = false): Promise<void> {
   if (!force) {
     const intervalMs = SLOW_STORES.has(product.store) ? SLOW_INTERVAL_MS : FAST_INTERVAL_MS;
@@ -52,7 +50,7 @@ async function checkProduct(client: Client, product: ProductRow, force = false):
     const result = await scraper.scrape(product.url);
     const wasInStock = product.in_stock === 1;
 
-    setInStock(product.id, result.inStock);
+    await setInStock(product.id, result.inStock);
 
     if (!wasInStock && result.inStock) {
       console.log(`[monitor] Stock alert: ${product.label}`);
@@ -67,10 +65,16 @@ export async function checkProductNow(client: Client, product: ProductRow): Prom
   await checkProduct(client, product, true);
 }
 
-async function sendAlert(client: Client, product: ProductRow, price?: string, stockAmount?: string, imageUrl?: string): Promise<void> {
+async function sendAlert(
+  client: Client,
+  product: ProductRow,
+  price?: string,
+  stockAmount?: string,
+  imageUrl?: string,
+): Promise<void> {
   const channelId =
-    (product.guild_id ? getConfig(`alert_channel_id:${product.guild_id}`) : null) ??
-    getConfig("alert_channel_id") ??
+    (product.guild_id ? await getConfig(`alert_channel_id:${product.guild_id}`) : null) ??
+    (await getConfig("alert_channel_id")) ??
     "";
   if (!channelId) return;
 

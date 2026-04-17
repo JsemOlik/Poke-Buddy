@@ -6,6 +6,7 @@ import * as help from "./commands/help.ts";
 import { startPoller, stopPoller } from "./monitor/poller.ts";
 import { closeBrowser } from "./monitor/browser.ts";
 import { startApiServer } from "./api/server.ts";
+import { initDb } from "./monitor/db.ts";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error("Missing DISCORD_TOKEN in .env");
@@ -18,10 +19,10 @@ for (const cmd of [ping, monitor, help]) {
   commands.set(cmd.data.name, cmd);
 }
 
-client.once(Events.ClientReady, (c) => {
+client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   monitor.initMonitor(c);
-  startPoller(c);
+  await startPoller(c);
   startApiServer(c);
 });
 
@@ -62,4 +63,5 @@ process.once("SIGINT", async () => {
   process.exit(0);
 });
 
+await initDb();
 await client.login(token);

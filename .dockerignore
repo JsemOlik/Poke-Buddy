@@ -1,0 +1,12 @@
+.env
+*.db
+*.db-shm
+*.db-wal
+node_modules
+web
+.git
+ez-solver
+index.ts
+README.md
+CLAUDE.md
+docker-compose.yml

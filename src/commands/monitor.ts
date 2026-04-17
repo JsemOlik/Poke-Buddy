@@ -19,7 +19,7 @@ import {
   StringSelectMenuOptionBuilder,
 } from "discord.js";
 import type { ProductRow } from "../monitor/db.ts";
-import { addProduct, removeProduct, listProducts, setConfig, listProductsByGuild } from "../monitor/db.ts";
+import { addProduct, removeProduct, setConfig, listProductsByGuild } from "../monitor/db.ts";
 import { getScraperForUrl, getStoreNameForUrl } from "../monitor/scrapers/index.ts";
 import { checkProductNow } from "../monitor/poller.ts";
 
@@ -174,7 +174,7 @@ async function handleAdd(interaction: ChatInputCommandInteraction): Promise<void
 }
 
 async function handleRemove(interaction: ChatInputCommandInteraction): Promise<void> {
-  const products = listProductsByGuild(interaction.guildId ?? "");
+  const products = await listProductsByGuild(interaction.guildId ?? "");
   if (products.length === 0) {
     await interaction.reply({ content: "No monitors to remove.", flags: MessageFlags.Ephemeral });
     return;
@@ -184,13 +184,13 @@ async function handleRemove(interaction: ChatInputCommandInteraction): Promise<v
 }
 
 async function handleList(interaction: ChatInputCommandInteraction): Promise<void> {
-  const { embed, components } = buildListPage(listProductsByGuild(interaction.guildId ?? ""), 0);
+  const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), 0);
   await interaction.reply({ embeds: [embed], components, flags: MessageFlags.Ephemeral });
 }
 
 async function handleSetChannel(interaction: ChatInputCommandInteraction): Promise<void> {
   const channel = interaction.options.getChannel("channel", true);
-  setConfig(`alert_channel_id:${interaction.guildId ?? ""}`, channel.id);
+  await setConfig(`alert_channel_id:${interaction.guildId ?? ""}`, channel.id);
   await interaction.reply({
     content: `Stock alerts will now be sent to <#${channel.id}>.`,
     flags: MessageFlags.Ephemeral,
@@ -239,7 +239,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
 
   let product: ProductRow;
   try {
-    product = addProduct(parsed.href, storeName, label, interaction.user.id, interaction.guildId ?? "");
+    product = await addProduct(parsed.href, storeName, label, interaction.user.id, interaction.guildId ?? "");
     if (_client) void checkProductNow(_client, product);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -251,7 +251,7 @@ export async function handleModalSubmit(interaction: ModalSubmitInteraction): Pr
     return;
   }
 
-  const { embed, components } = buildListPage(listProductsByGuild(interaction.guildId ?? ""), 0);
+  const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), 0);
   await interaction.editReply({ embeds: [embed], components });
 }
 
@@ -265,7 +265,7 @@ export async function handleButton(interaction: ButtonInteraction): Promise<void
 
   if (customId.startsWith("monitor:nav:")) {
     const page = parseInt(customId.split(":")[2]!, 10);
-    const { embed, components } = buildListPage(listProductsByGuild(interaction.guildId ?? ""), page);
+    const { embed, components } = buildListPage(await listProductsByGuild(interaction.guildId ?? ""), page);
     await interaction.update({ embeds: [embed], components });
     return;
   }
@@ -276,9 +276,9 @@ export async function handleSelectMenu(
 ): Promise<void> {
   if (interaction.customId !== "monitor:remove-cmd") return;
 
-  removeProduct(parseInt(interaction.values[0]!, 10));
+  await removeProduct(parseInt(interaction.values[0]!, 10));
 
-  const products = listProductsByGuild(interaction.guildId ?? "");
+  const products = await listProductsByGuild(interaction.guildId ?? "");
   if (products.length === 0) {
     await interaction.update({ content: "No more monitors.", components: [] });
     return;

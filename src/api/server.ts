@@ -31,7 +31,7 @@ function checkAuth(req: Request): boolean {
 }
 
 export function startApiServer(client: Client): void {
-  const port = parseInt(process.env.API_PORT ?? "4000", 10);
+  const port = parseInt(process.env.API_PORT ?? "4040", 10);
 
   Bun.serve({
     port,
@@ -53,11 +53,7 @@ export function startApiServer(client: Client): void {
       if (req.method === "GET" && guildMatch) {
         const guild = client.guilds.cache.get(guildMatch[1]!);
         if (!guild) return json({ error: "Guild not found" }, 404);
-        return json({
-          id: guild.id,
-          name: guild.name,
-          icon: guild.icon,
-        });
+        return json({ id: guild.id, name: guild.name, icon: guild.icon });
       }
 
       // GET /api/guilds/:id/channels — text channels for the guild
@@ -75,7 +71,7 @@ export function startApiServer(client: Client): void {
       // GET /api/monitors?guild=<id>
       if (req.method === "GET" && path === "/api/monitors") {
         const guildId = url.searchParams.get("guild") ?? "";
-        const monitors = guildId ? listProductsByGuild(guildId) : listProducts();
+        const monitors = guildId ? await listProductsByGuild(guildId) : await listProducts();
         return json({ monitors });
       }
 
@@ -108,7 +104,7 @@ export function startApiServer(client: Client): void {
         } catch { /* non-fatal — poller will get it */ }
 
         try {
-          const product = addProduct(parsed.href, storeName, label, addedBy, guildId);
+          const product = await addProduct(parsed.href, storeName, label, addedBy, guildId);
           void checkProductNow(client, product);
           return json({ monitor: product }, 201);
         } catch (err: unknown) {
@@ -123,10 +119,10 @@ export function startApiServer(client: Client): void {
       if (req.method === "DELETE" && deleteMatch) {
         const id = parseInt(deleteMatch[1]!, 10);
         const delGuildId = url.searchParams.get("guild") ?? "";
-        const product = getProduct(id);
+        const product = await getProduct(id);
         if (!product) return json({ error: "Not found" }, 404);
         if (delGuildId && product.guild_id !== delGuildId) return json({ error: "Not found" }, 404);
-        removeProduct(id);
+        await removeProduct(id);
         return json({ success: true });
       }
 
@@ -134,8 +130,8 @@ export function startApiServer(client: Client): void {
       if (req.method === "GET" && path === "/api/config") {
         const guildId = url.searchParams.get("guild") ?? "";
         const alertChannelId =
-          (guildId ? getConfig(`alert_channel_id:${guildId}`) : null) ??
-          getConfig("alert_channel_id") ??
+          (guildId ? await getConfig(`alert_channel_id:${guildId}`) : null) ??
+          (await getConfig("alert_channel_id")) ??
           "";
         return json({ alert_channel_id: alertChannelId });
       }
@@ -150,7 +146,7 @@ export function startApiServer(client: Client): void {
         const value = (body.value ?? "").trim();
         const guildId = (body.guildId ?? "").trim();
         if (!key) return json({ error: "key is required" }, 400);
-        setConfig(guildId ? `${key}:${guildId}` : key, value);
+        await setConfig(guildId ? `${key}:${guildId}` : key, value);
         return json({ success: true });
       }
 

@@ -4,7 +4,8 @@
       "Bash(bunx --bun shadcn@latest add badge card skeleton)",
       "Bash(bun run *)",
       "Bash(bunx --bun shadcn@latest add dialog input select separator)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(bun install *)"
     ]
   }
 }
