@@ -7,12 +7,19 @@ const storeDisplayNames: Record<string, string> = {
   cdmc: "CDMC.cz",
 };
 
+const storeColors: Record<string, number> = {
+  hrananetu: 0x4b0082, // dark purple
+  cardstore: 0xffd700, // gold
+  cdmc:      0xe74c3c, // red
+};
+
 export function buildStockAlert(
   product: ProductRow,
   price?: string,
   stockAmount?: string,
 ): EmbedBuilder {
   const storeName = storeDisplayNames[product.store] ?? product.store;
+  const color = storeColors[product.store] ?? Colors.Green;
 
   const fields: { name: string; value: string; inline: boolean }[] = [
     { name: "Store", value: storeName, inline: true },
@@ -26,9 +33,9 @@ export function buildStockAlert(
   fields.push({ name: "Link", value: `[View Product](${product.url})`, inline: false });
 
   return new EmbedBuilder()
-    .setColor(Colors.Green)
+    .setColor(color)
     .setTitle("Back in Stock!")
-    .setDescription(`**${product.label}** is now available on **${storeName}**!`)
+    .setDescription(`**${product.label}**`)
     .setURL(product.url)
     .addFields(...fields)
     .setTimestamp()
