@@ -25,7 +25,7 @@ client.once(Events.ClientReady, async (c) => {
     status: "online",
     activities: [{
       name: "Pokémon!",
-      type: ActivityType.Watching,
+      type: ActivityType.Playing,
     }],
   });
   monitor.initMonitor(c);

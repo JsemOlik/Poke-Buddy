@@ -17,6 +17,7 @@ import {
   ButtonStyle,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  PermissionFlagsBits,
 } from "discord.js";
 import type { ProductRow } from "../monitor/db.ts";
 import { addProduct, removeProduct, setConfig, listProductsByGuild } from "../monitor/db.ts";
@@ -40,6 +41,7 @@ const storeDisplayNames: Record<string, string> = {
 export const data = new SlashCommandBuilder()
   .setName("monitor")
   .setDescription("Manage product stock monitors")
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
   .addSubcommand((sub) =>
     sub.setName("add").setDescription("Start monitoring a product URL")
   )
@@ -63,6 +65,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    await interaction.reply({ content: "You need the **Manage Server** permission to use this command.", flags: MessageFlags.Ephemeral });
+    return;
+  }
   const sub = interaction.options.getSubcommand();
   if (sub === "add") return handleAdd(interaction);
   if (sub === "remove") return handleRemove(interaction);
