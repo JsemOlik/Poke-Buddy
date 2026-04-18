@@ -10,8 +10,11 @@ const PROFILE_DIR = join(import.meta.dir, "../../../chromium-data");
 const HEADLESS = process.env.CHROMIUM_VISIBLE !== "1";
 
 let _proc: Subprocess | null = null;
+// Deduplicates concurrent calls — if two scrapers call ensureChromium()
+// simultaneously, only one Chromium process is spawned.
 let _ensurePromise: Promise<void> | null = null;
 
+// Polls the CDP HTTP endpoint until Chromium is accepting connections.
 async function waitForCDP(): Promise<void> {
   for (let i = 0; i < 30; i++) {
     try {
@@ -30,6 +33,8 @@ async function spawnChromium(): Promise<void> {
     if (res.ok) return;
   } catch {}
 
+  // chromium.executablePath() is a synchronous path lookup — no process or
+  // WebSocket involved, so it's safe to call even though we bypass the rest of Playwright.
   const execPath = chromium.executablePath();
   console.log(`[browser] Spawning Chromium on port ${CDP_PORT}`);
 
@@ -54,6 +59,7 @@ async function spawnChromium(): Promise<void> {
   console.log(`[browser] CDP ready on port ${CDP_PORT}`);
 }
 
+// Ensures Chromium is running. Safe to call from multiple scrapers concurrently.
 export async function ensureChromium(): Promise<void> {
   if (!_ensurePromise) {
     _ensurePromise = spawnChromium().finally(() => { _ensurePromise = null; });

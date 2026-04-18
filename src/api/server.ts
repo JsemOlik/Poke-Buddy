@@ -1,3 +1,6 @@
+// Internal REST API consumed exclusively by the web dashboard.
+// Every request must include the X-API-Key header matching API_SECRET_KEY.
+
 import type { Client } from "discord.js";
 import { ChannelType } from "discord.js";
 import {
@@ -36,6 +39,7 @@ export function startApiServer(client: Client): void {
   Bun.serve({
     port,
     async fetch(req) {
+      // Handle CORS preflight from the web dashboard.
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
       if (!checkAuth(req)) return json({ error: "Unauthorized" }, 401);
 
@@ -76,6 +80,7 @@ export function startApiServer(client: Client): void {
       }
 
       // POST /api/monitors — { url, guildId, addedBy? }
+      // Scrapes the product immediately to get the label, then kicks off a background check.
       if (req.method === "POST" && path === "/api/monitors") {
         let body: { url?: string; guildId?: string; addedBy?: string };
         try { body = await req.json() as typeof body; } catch {
@@ -94,6 +99,7 @@ export function startApiServer(client: Client): void {
         const storeName = getStoreNameForUrl(parsed.href);
         if (!storeName) return json({ error: "Unsupported store" }, 400);
 
+        // Derive a human-readable label from the URL slug as a fallback.
         const fallbackLabel =
           parsed.pathname.split("/").filter(Boolean).pop()?.replace(/-/g, " ") ?? rawUrl;
 
@@ -121,6 +127,7 @@ export function startApiServer(client: Client): void {
         const delGuildId = url.searchParams.get("guild") ?? "";
         const product = await getProduct(id);
         if (!product) return json({ error: "Not found" }, 404);
+        // Scope check — the web dashboard can only delete its own guild's monitors.
         if (delGuildId && product.guild_id !== delGuildId) return json({ error: "Not found" }, 404);
         await removeProduct(id);
         return json({ success: true });
@@ -146,6 +153,7 @@ export function startApiServer(client: Client): void {
         const value = (body.value ?? "").trim();
         const guildId = (body.guildId ?? "").trim();
         if (!key) return json({ error: "key is required" }, 400);
+        // Namespace guild-specific config under "key:guildId" to avoid collisions.
         await setConfig(guildId ? `${key}:${guildId}` : key, value);
         return json({ success: true });
       }

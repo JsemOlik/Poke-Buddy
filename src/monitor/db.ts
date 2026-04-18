@@ -12,6 +12,8 @@ export interface ProductRow {
   guild_id: string;
 }
 
+// Automatically switch between SQLite (local) and PostgreSQL (production)
+// based on whether DATABASE_URL starts with "postgres".
 const DATABASE_URL = process.env.DATABASE_URL ?? "";
 const USE_PG = DATABASE_URL.startsWith("postgres");
 
@@ -19,6 +21,8 @@ const USE_PG = DATABASE_URL.startsWith("postgres");
 let sql: any = null;
 let db: Database | null = null;
 
+// Creates all required tables if they don't already exist.
+// Called once at bot startup before anything else touches the database.
 export async function initDb(): Promise<void> {
   if (USE_PG) {
     const { default: postgres } = await import("postgres");
@@ -92,6 +96,8 @@ export async function initDb(): Promise<void> {
   `);
 }
 
+// PostgreSQL returns BigInt for BIGINT/SERIAL columns — normalise everything
+// to plain JS numbers so callers don't need to know which DB is active.
 function pgRow(row: Record<string, unknown>): ProductRow {
   return {
     id: Number(row["id"]),
@@ -124,6 +130,7 @@ export async function addProduct(
       if (!rows[0]) throw new Error("Failed to insert product");
       return pgRow(rows[0] as Record<string, unknown>);
     } catch (err: unknown) {
+      // Normalise PostgreSQL's unique violation to the same message SQLite throws.
       if ((err as { code?: string }).code === "23505") throw new Error("UNIQUE constraint failed: url");
       throw err;
     }
@@ -179,6 +186,7 @@ export async function getProduct(id: number): Promise<ProductRow | null> {
   ).get(id) ?? null;
 }
 
+// Updates in_stock flag and appends a timestamped event row for history.
 export async function setInStock(id: number, inStock: boolean): Promise<void> {
   const now = Date.now();
   const val = inStock ? 1 : 0;

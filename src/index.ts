@@ -12,22 +12,26 @@ import { startPresenceRotation } from "./presence.ts";
 const token = process.env.DISCORD_TOKEN;
 if (!token) throw new Error("Missing DISCORD_TOKEN in .env");
 
+// Guilds intent is the minimum needed for slash commands and channel access.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+// Register all slash commands in a keyed collection for O(1) dispatch.
 const commands = new Collection<string, Command>();
 
 for (const cmd of [ping, monitor, help]) {
   commands.set(cmd.data.name, cmd);
 }
 
+// Once the bot is connected and ready, start all background services.
 client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
-  startPresenceRotation(c);
-  monitor.initMonitor(c);
-  await startPoller(c);
-  startApiServer(c);
+  startPresenceRotation(c);   // rotating Discord status
+  monitor.initMonitor(c);     // gives the monitor command access to the client
+  await startPoller(c);       // begins the product stock-check loop
+  startApiServer(c);          // starts the REST API used by the web dashboard
 });
 
+// Route every Discord interaction to the correct handler.
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
@@ -58,6 +62,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+// Clean up the poller, browser process, and Discord connection on Ctrl+C.
 process.once("SIGINT", async () => {
   stopPoller();
   await closeBrowser();

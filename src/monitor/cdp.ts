@@ -1,3 +1,7 @@
+// Bun-native Chrome DevTools Protocol client.
+// Playwright's WebSocket layer hangs in Bun, so we talk to Chromium directly
+// over CDP using Bun's built-in WebSocket and fetch.
+
 const CDP_BASE = "http://127.0.0.1:9222";
 
 interface CdpMsg {
@@ -29,6 +33,7 @@ class CdpSession {
       const msg = JSON.parse(data as string) as CdpMsg;
       const sid = msg.sessionId ?? "";
 
+      // Route command responses back to their waiting Promise.
       if (msg.id !== undefined) {
         const cb = this.pending.get(`${sid}|${msg.id}`);
         if (cb) {
@@ -37,6 +42,7 @@ class CdpSession {
         }
       }
 
+      // Dispatch browser/page events to any registered one-shot listeners.
       if (msg.method) {
         for (const h of this.eventHandlers.get(`${sid}|${msg.method}`) ?? []) h(msg.params);
       }
@@ -57,6 +63,7 @@ class CdpSession {
     });
   }
 
+  // Waits for a single CDP event then removes the listener.
   onceEvent(method: string, sessionId: string | undefined, timeoutMs: number): Promise<unknown> {
     const key = `${sessionId ?? ""}|${method}`;
     const handlers = this.eventHandlers.get(key) ?? [];
@@ -81,6 +88,7 @@ class CdpSession {
   }
 }
 
+// Wraps a CDP session + target into a simple page API used by the scrapers.
 class CdpPageImpl implements CdpPage {
   constructor(
     private cdp: CdpSession,
@@ -99,6 +107,8 @@ class CdpPageImpl implements CdpPage {
     await domReady;
   }
 
+  // Polls via Runtime.evaluate rather than subscribing to DOM mutation events —
+  // simpler and reliable enough given scrapers only need a single stable element.
   async waitForSelector(selector: string, timeoutMs = 10_000): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -126,6 +136,7 @@ class CdpPageImpl implements CdpPage {
   }
 }
 
+// Opens a new blank browser tab and returns a CdpPage handle for it.
 export async function openPage(): Promise<CdpPage> {
   // Use browser-level WebSocket — avoids the /json/new HTTP endpoint which
   // was deprecated in newer Chromium (returns non-JSON for GET requests).
@@ -141,12 +152,14 @@ export async function openPage(): Promise<CdpPage> {
 
   const cdp = new CdpSession(ws);
 
+  // Create a new tab and attach a session to it for page-level CDP commands.
   const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" }) as { targetId: string };
   const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true }) as { sessionId: string };
 
   await cdp.send("Page.enable", {}, sessionId);
 
-  // Patch headless indicators before any page scripts run
+  // Patch headless indicators before any page scripts run so sites can't
+  // detect that they're running inside an automated browser.
   await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
     source: `
       Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
