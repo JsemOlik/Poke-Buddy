@@ -6,7 +6,8 @@
       "Bash(bunx --bun shadcn@latest add dialog input select separator)",
       "Bash(python3 *)",
       "Bash(bun install *)",
-      "Bash(grep -E \"\\\\.\\(ts|json|md|yml|yaml|env\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|json|md|yml|yaml|env\\)$\")",
+      "Bash(bunx shadcn@latest add tooltip --yes)"
     ]
   }
 }
