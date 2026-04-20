@@ -2,7 +2,8 @@ import { parse } from "node-html-parser";
 import type { StockScraper, ScrapeResult } from "./base.ts";
 import { fetchHtml } from "./base.ts";
 
-const OUT_OF_STOCK_PHRASES = ["není skladem", "vyprodáno", "nedostupné"];
+// "vyprodán" is a stem that matches both "vyprodáno" and "vyprodána" (feminine, e.g. "položka byla vyprodána")
+const OUT_OF_STOCK_PHRASES = ["není skladem", "vyprodán", "nedostupné"];
 
 export const cdmcScraper: StockScraper = {
   storeName: "cdmc",
@@ -36,6 +37,17 @@ export const cdmcScraper: StockScraper = {
       .replace(/\s+/g, " ");
 
     const imageUrl = root.querySelector("a.p-main-image img")?.getAttribute("src") ?? undefined;
+
+    // Release date badge: class like "flag-vychazi-24-4-2026"
+    const releaseBadge = root
+      .querySelectorAll(".flag")
+      .find((el) => /flag-vychazi-\d/.test(el.classNames));
+    const releaseDate = releaseBadge?.text.trim() || undefined;
+
+    // Future release always overrides stock status
+    if (releaseDate) {
+      return { stock: "not-in-stock", label, price: priceText, stockAmount: releaseDate, imageUrl };
+    }
 
     return { stock, label, price: priceText, stockAmount, imageUrl };
   },
