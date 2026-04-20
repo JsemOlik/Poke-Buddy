@@ -33,11 +33,20 @@ export const alzaScraper: StockScraper = {
 
     const availBtn = root.querySelector('button[data-testid*="availabilityText"]');
     const availText = availBtn?.text.trim().toLowerCase() ?? "";
-    const inStock =
-      availText.length > 0 &&
-      availText.includes("skladem") &&
-      !OUT_OF_STOCK_PHRASES.some((p) => availText.includes(p));
-    const stock: ScrapeResult["stock"] = inStock ? "in-stock" : "not-in-stock";
+
+    // "Předp. cena" header means the price is a pre-order/forecast price → not yet released
+    const isPreorderPrice = !!root.querySelector(".ads-pb--preorder, .ads-pb__header");
+    const preorderLabel = root.querySelector(".ads-pb__header")?.text.trim().toLowerCase() ?? "";
+    const hasPreorderPriceHeader = isPreorderPrice && preorderLabel.includes("předp");
+
+    let stock: ScrapeResult["stock"];
+    if (availText.includes("skladem") && !OUT_OF_STOCK_PHRASES.some((p) => availText.includes(p))) {
+      stock = "in-stock";
+    } else if (hasPreorderPriceHeader) {
+      stock = "pre-order";
+    } else {
+      stock = "not-in-stock";
+    }
 
     const rawAvail = availBtn?.text.trim() ?? "";
     const stockAmount = rawAvail.replace(/^skladem\s*/i, "").trim() || undefined;
@@ -51,7 +60,7 @@ export const alzaScraper: StockScraper = {
       ? rawSrc.replace(/([?&]width=)\d+/, "$1500").replace(/([?&]height=)\d+/, "$1500")
       : undefined;
 
-    console.log(`[alza] Done — stock=${stock}, label="${label}"`);
+    console.log(`[alza] Done — stock=${stock}, label="${label}", preorderPrice=${hasPreorderPriceHeader}`);
     return { stock, label, price, stockAmount, imageUrl };
   },
 };
