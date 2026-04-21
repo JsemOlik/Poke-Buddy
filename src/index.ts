@@ -1,8 +1,8 @@
 import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import type { Command } from "./types.ts";
 import * as ping from "./commands/ping.ts";
-import * as monitor from "./commands/monitor.ts";
-import * as help from "./commands/help.ts";
+// import * as monitor from "./commands/monitor.ts";
+// import * as help from "./commands/help.ts";
 import { startPoller, stopPoller } from "./monitor/poller.ts";
 import { closeBrowser } from "./monitor/browser.ts";
 import { startApiServer } from "./api/server.ts";
@@ -18,7 +18,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 // Register all slash commands in a keyed collection for O(1) dispatch.
 const commands = new Collection<string, Command>();
 
-for (const cmd of [ping, monitor, help]) {
+for (const cmd of [ping /*, monitor, help */]) {
   commands.set(cmd.data.name, cmd);
 }
 
@@ -26,7 +26,7 @@ for (const cmd of [ping, monitor, help]) {
 client.once(Events.ClientReady, async (c) => {
   console.log(`Logged in as ${c.user.tag}`);
   startPresenceRotation(c);   // rotating Discord status
-  monitor.initMonitor(c);     // gives the monitor command access to the client
+  // monitor.initMonitor(c);     // gives the monitor command access to the client
   await startPoller(c);       // begins the product stock-check loop
   startApiServer(c);          // starts the REST API used by the web dashboard
 });
@@ -38,7 +38,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const command = commands.get(interaction.commandName);
       if (!command) return;
       await command.execute(interaction);
-    } else if (interaction.isModalSubmit()) {
+    } /* else if (interaction.isModalSubmit()) {
       if (interaction.customId.startsWith("monitor:")) {
         await monitor.handleModalSubmit(interaction);
       }
@@ -50,7 +50,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId.startsWith("monitor:")) {
         await monitor.handleSelectMenu(interaction);
       }
-    }
+    } */
   } catch (error) {
     console.error(error);
     const msg = { content: "An error occurred.", ephemeral: true };
