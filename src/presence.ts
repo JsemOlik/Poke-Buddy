@@ -23,7 +23,7 @@ export function startPresenceRotation(client: Client): void {
 
     const slides = [
       { type: ActivityType.Playing,  name: "Pokémon!" },
-      { type: ActivityType.Playing,  name: "Pokémon!" }
+      { type: ActivityType.Playing,  name: "Pokémon!" },
       // { type: ActivityType.Watching, name: `${monitorCount} product${monitorCount !== 1 ? "s" : ""}` },
     ];
 
