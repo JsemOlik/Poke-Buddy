@@ -10,7 +10,10 @@ import { initDb } from "./monitor/db.ts";
 import { startPresenceRotation } from "./presence.ts";
 
 const token = process.env.DISCORD_TOKEN;
+const guildId = process.env.DISCORD_GUILD_ID;
+
 if (!token) throw new Error("Missing DISCORD_TOKEN in .env");
+if (!guildId) console.warn("[bot] Warning: DISCORD_GUILD_ID is not set. The bot will not restrict interactions to a specific server.");
 
 // Guilds intent is the minimum needed for slash commands and channel access.
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
@@ -33,6 +36,15 @@ client.once(Events.ClientReady, async (c) => {
 
 // Route every Discord interaction to the correct handler.
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (guildId && interaction.guildId !== guildId) {
+    if (interaction.isRepliable()) {
+      await interaction.reply({
+        content: "Bot funguje pouze na našem serveru :D Více info na MonBuddy.app",
+        ephemeral: true,
+      });
+    }
+    return;
+  }
   try {
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);

@@ -4,6 +4,8 @@ import { getScraperForUrl } from "./scrapers/index.ts";
 import { buildStockAlert } from "./alert.ts";
 import { createReleaseEvent } from "./events.ts";
 
+const GUILD_ID = process.env.DISCORD_GUILD_ID;
+
 // Alza and Smarty route through EzSolver (real Chromium), which is much slower
 // than a plain fetch — poll them less frequently to avoid overloading the solver.
 const SLOW_STORES = new Set(["alza", "smarty", "jrc"]);
@@ -72,7 +74,9 @@ async function checkProduct(client: Client, product: ProductRow, force = false):
       console.log(`[monitor] Release date alert: ${product.label} — ${result.releaseDate}`);
       await setReleaseDate(product.id, result.releaseDate);
       await sendAlert(client, product, "release-date", result.price, result.stockAmount, result.imageUrl, result.releaseDate);
-      void createReleaseEvent(client, product, result.releaseDate, result.imageUrl);
+      if (!GUILD_ID || product.guild_id === GUILD_ID) {
+        void createReleaseEvent(client, product, result.releaseDate, result.imageUrl);
+      }
     }
   } catch (err) {
     console.error(`[monitor] Failed to check ${product.url}:`, err);
@@ -100,6 +104,11 @@ async function sendAlert(
     (await getConfig("alert_channel_id")) ??
     "";
   if (!channelId) return;
+
+  // If a global guild lock is active, skip alerts for other guilds.
+  if (GUILD_ID && product.guild_id !== GUILD_ID) {
+    return;
+  }
 
   try {
     const channel = await client.channels.fetch(channelId);
